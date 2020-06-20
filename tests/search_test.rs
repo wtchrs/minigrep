@@ -7,11 +7,7 @@ mod tests {
     #[test]
     fn case_sensitive() {
         let query = "duct";
-        let contents = "\
-Rust:
-safe, fast, productive.
-Pick three.
-Duct tape";
+        let contents = "Rust:\nsafe, fast, productive.\nPick three.\nDuct tape";
 
         assert_eq!(vec!["safe, fast, productive."], search(query, contents));
     }
@@ -19,11 +15,7 @@ Duct tape";
     #[test]
     fn case_insensitive() {
         let query = "rUsT";
-        let contents = "\
-Rust:
-safe, fast, productive.
-Pick three.
-Trust me.";
+        let contents = "Rust:\nsafe, fast, productive.\nPick three.\nTrust me.";
 
         assert_eq!(
             vec!["Rust:", "Trust me."],
