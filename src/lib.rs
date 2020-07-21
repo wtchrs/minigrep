@@ -58,6 +58,7 @@ impl Config {
             None => return Err("Not enough args"),
         };
 
+        //TODO: add more options and two-hyphen options
         let mut flag_str = String::new();
         for s in flags {
             flag_str.push_str(&s);
