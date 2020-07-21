@@ -41,20 +41,35 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(mut args: env::Args) -> Result<Config, &'static str> {
-        args.next();
+    pub fn new(args: env::Args) -> Result<Config, &'static str> {
+        let (flags, others): (Vec<String>, Vec<String>) =
+            args.partition(|s| s.chars().nth(0).unwrap() == '-');
 
-        let query = match args.next() {
+        let mut others = others.iter();
+        others.next();
+
+        let query = match others.next() {
             Some(arg) => arg,
             None => return Err("Not enough args"),
         };
 
-        let filename = match args.next() {
+        let filename = match others.next() {
             Some(arg) => arg,
             None => return Err("Not enough args"),
         };
 
-        let case_sensitive = env::var("CASE_INSENSITIVE").is_err();
+        let mut flag_str = String::new();
+        for s in flags {
+            flag_str.push_str(&s);
+        }
+
+        let case_sensitive = match flag_str.chars().filter(|ch| *ch == 'i').next() {
+            Some(_) => false,
+            None => true,
+        };
+
+        let query = query.to_string();
+        let filename = filename.to_string();
 
         Ok(Config {
             query,
