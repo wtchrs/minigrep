@@ -59,8 +59,20 @@ impl Config {
         };
 
         //TODO: add more options and two-hyphen options
+        let (short_flag, long_flag): (Vec<&String>, Vec<&String>) =
+            flags.iter().partition(|s| match s.chars().nth(1) {
+                Some(ch) => {
+                    if ch != '-' {
+                        true
+                    } else {
+                        false
+                    }
+                }
+                None => true,
+            });
+
         let mut flag_str = String::new();
-        for s in flags {
+        for s in short_flag {
             flag_str.push_str(&s);
         }
 
