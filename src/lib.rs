@@ -5,7 +5,7 @@ use std::fs;
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let contents = fs::read_to_string(config.filename)?;
 
-    let results = if config.is_case_sensitive {
+    let results = if config.flag.case_sensitive {
         search(&config.query, &contents)
     } else {
         search_case_insensitive(&config.query, &contents)
@@ -37,7 +37,7 @@ pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<&'a st
 pub struct Config {
     pub query: String,
     pub filename: String,
-    pub is_case_sensitive: bool,
+    pub flag: Flag,
 }
 
 impl Config {
@@ -58,18 +58,39 @@ impl Config {
             None => return Err("Not enough args"),
         };
 
-        //TODO: add more options and two-hyphen options
+        let flag = match Flag::from_vec(flags) {
+            Ok(f) => f,
+            Err(s) => return Err(s),
+        };
+
+        Ok(Config {
+            query: query.to_string(),
+            filename: filename.to_string(),
+            flag,
+        })
+    }
+}
+
+pub struct Flag {
+    case_sensitive: bool,
+}
+
+impl Flag {
+    fn from_vec(flag_vec: Vec<String>) -> Result<Flag, &'static str> {
         let (short_flag, long_flag): (Vec<&String>, Vec<&String>) =
-            flags.iter().partition(|s| match s.chars().nth(1) {
-                Some(ch) => {
-                    if ch != '-' {
-                        true
-                    } else {
-                        false
-                    }
+
+        //TODO: add more options and two-hyphen options
+
+        flag_vec.iter().partition(|s| match s.chars().nth(1) {
+            Some(ch) => {
+                if ch != '-' {
+                    true
+                } else {
+                    false
                 }
-                None => true,
-            });
+            }
+            None => true,
+        });
 
         let mut flag_str = String::new();
         for s in short_flag {
@@ -81,13 +102,6 @@ impl Config {
             None => true,
         };
 
-        let query = query.to_string();
-        let filename = filename.to_string();
-
-        Ok(Config {
-            query,
-            filename,
-            is_case_sensitive: case_sensitive,
-        })
+        Ok(Flag { case_sensitive })
     }
 }
