@@ -58,10 +58,7 @@ impl Config {
             None => return Err("Not enough args"),
         };
 
-        let flag = match Flag::from_vec(flags) {
-            Ok(f) => f,
-            Err(s) => return Err(s),
-        };
+        let flag = Flag::from_vec(flags)?;
 
         Ok(Config {
             query: query.to_string(),
@@ -100,17 +97,14 @@ impl Flag {
         let ignore_case = if ignore_case_long { true } else { ignore_case };
 
         let (no_ignore_case, long_flag) = Flag::long_flag_parse(long_flag, "--no-ignore-case");
-        let ignore_case = match no_ignore_case {
-            true => {
-                if ignore_case {
-                    return Err(
-                        "cannot use both \"--ignore-case(-i)\" and \"--no-ignore-case\" flags",
-                    );
-                } else {
-                    false
-                }
+        let ignore_case = if no_ignore_case {
+            if ignore_case {
+                return Err("cannot use both \"--ignore-case(-i)\" and \"--no-ignore-case\" flags");
+            } else {
+                false
             }
-            false => ignore_case,
+        } else {
+            ignore_case
         };
 
         //TODO: add more short options and two-hyphen options
