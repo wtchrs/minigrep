@@ -11,6 +11,13 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
         search(&config.query, &contents)
     };
 
+    let results =
+        if (config.flag.max_count != 0) && ((config.flag.max_count as usize) < results.len()) {
+            &results[..config.flag.max_count as usize]
+        } else {
+            &results[..]
+        };
+
     for line in results {
         println!("{}", line);
     }
@@ -41,26 +48,23 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(args: env::Args) -> Result<Config, &'static str> {
-        let (flags, others): (Vec<String>, Vec<String>) =
-            args.partition(|s| s.chars().nth(0).unwrap() == '-');
+    pub fn new(args: env::Args) -> Result<Config, String> {
+        let args = args.collect();
+        let (flag, others) = Flag::from_vec(&args)?;
 
         let mut others = others.iter();
         others.next();
 
-        let query = match others.next() {
-            Some(arg) => arg,
-            None => return Err("Not enough args"),
+        let query = if let Some(arg) = others.next() {
+            arg
+        } else {
+            return Err("Not enough arguments".to_string());
         };
 
-        let filename = match others.next() {
-            Some(arg) => arg,
-            None => return Err("Not enough args"),
-        };
-
-        let flag = match Flag::from_vec(flags) {
-            Ok(f) => f,
-            Err(s) => return Err(s),
+        let filename = if let Some(arg) = others.next() {
+            arg
+        } else {
+            return Err("Not enough arguments".to_string());
         };
 
         Ok(Config {
@@ -73,76 +77,86 @@ impl Config {
 
 pub struct Flag {
     pub ignore_case: bool,
+    pub max_count: u8,
 }
 
+// it should have more options and logics
 impl Flag {
-    pub fn from_vec(flag_vec: Vec<String>) -> Result<Flag, &'static str> {
-        let (short_flag, long_flag): (Vec<&String>, Vec<&String>) =
-            flag_vec.iter().partition(|s| match s.chars().nth(1) {
-                Some(ch) => {
-                    if ch != '-' {
-                        true
-                    } else {
-                        false
+    pub fn from_vec<'a>(flag_strs: &'a Vec<String>) -> Result<(Flag, Vec<&'a String>), String> {
+        let mut iter = flag_strs.iter();
+        let mut flags: Flag = Default::default();
+        let mut arguments = Vec::new();
+
+        while let Some(flag_str) = iter.next() {
+            if flag_str.chars().nth(0).unwrap() != '-' {
+                arguments.push(flag_str);
+                continue;
+            }
+
+            if flag_str.chars().nth(1).unwrap() != '-' {
+                let mut short_iter = flag_str.chars();
+                short_iter.next();
+
+                while let Some(flag_ch) = short_iter.next() {
+                    match flag_ch {
+                        'i' => flags.ignore_case = true,
+                        'm' => {
+                            let max_num: String = short_iter.collect();
+                            flags.max_count = if max_num != "" {
+                                if let Ok(num) = max_num.parse() {
+                                    num
+                                } else {
+                                    return Err("invalid max count".to_string());
+                                }
+                            } else if let Some(s) = iter.next() {
+                                if let Ok(num) = s.parse() {
+                                    num
+                                } else {
+                                    return Err("invalide max count".to_string());
+                                }
+                            } else {
+                                return Err("invalid max count".to_string());
+                            };
+                            break;
+                        }
+                        _ => return Err(format!("can't parse option {}", flag_ch)),
                     }
                 }
-                None => true,
-            });
-
-        let mut short_flag_str = String::new();
-        for s in short_flag {
-            short_flag_str.push_str(&s);
-        }
-        let short_flag_str: String = short_flag_str.chars().filter(|ch| *ch != '-').collect();
-
-        let (ignore_case, short_flag_str) = Flag::short_flag_parse(short_flag_str, 'i');
-        let (ignore_case_long, long_flag) = Flag::long_flag_parse(long_flag, "--ignore-case");
-        let ignore_case = if ignore_case_long { true } else { ignore_case };
-
-        let (no_ignore_case, long_flag) = Flag::long_flag_parse(long_flag, "--no-ignore-case");
-        let ignore_case = match no_ignore_case {
-            true => {
-                if ignore_case {
-                    return Err(
-                        "cannot use both \"--ignore-case(-i)\" and \"--no-ignore-case\" flags",
-                    );
-                } else {
-                    false
+            } else {
+                let mut split_flag = flag_str.split('=');
+                match split_flag.next().unwrap() {
+                    "--ignore-case" => flags.ignore_case = true,
+                    "--max-count" => {
+                        flags.max_count = if let Some(s) = split_flag.next() {
+                            if let Ok(num) = s.parse() {
+                                num
+                            } else {
+                                return Err("invalid max count".to_string());
+                            }
+                        } else if let Some(s) = iter.next() {
+                            if let Ok(num) = s.parse() {
+                                num
+                            } else {
+                                return Err("invalid max count".to_string());
+                            }
+                        } else {
+                            return Err("invalid max count".to_string());
+                        }
+                    }
+                    _ => return Err(format!("can't parse option {}", flag_str)),
                 }
             }
-            false => ignore_case,
-        };
-
-        //TODO: add more short options and two-hyphen options
-
-        if (&short_flag_str[..] != "") | (long_flag.len() != 0) {
-            Err("Unknown flag(s) in arguments")
-        } else {
-            Ok(Flag { ignore_case })
         }
+
+        Ok((flags, arguments))
     }
+}
 
-    fn short_flag_parse(flag_str: String, flag_ch: char) -> (bool, String) {
-        let (match_flag, flag_str): (String, String) =
-            flag_str.chars().partition(|ch| *ch == flag_ch);
-
-        let match_flag = match &match_flag[..] {
-            "" => false,
-            _ => true,
-        };
-
-        (match_flag, flag_str)
-    }
-
-    fn long_flag_parse<'a>(flag_vec: Vec<&'a String>, flag_str: &str) -> (bool, Vec<&'a String>) {
-        let (match_flag_vec, flag_vec): (Vec<&String>, Vec<&String>) =
-            flag_vec.iter().partition(|s| &s[..] == flag_str);
-
-        let match_flag = match match_flag_vec.iter().next() {
-            Some(_) => true,
-            None => false,
-        };
-
-        (match_flag, flag_vec)
+impl Default for Flag {
+    fn default() -> Self {
+        Self {
+            ignore_case: false,
+            max_count: 0,
+        }
     }
 }
