@@ -80,7 +80,7 @@ pub struct Flag {
     pub max_count: u8,
 }
 
-// it should have more options and logics
+// it should have more options and logics.
 impl Flag {
     pub fn from_vec<'a>(flag_strs: &'a Vec<String>) -> Result<(Flag, Vec<&'a String>), String> {
         let mut iter = flag_strs.iter();
@@ -94,61 +94,79 @@ impl Flag {
             }
 
             if flag_str.chars().nth(1).unwrap() != '-' {
-                let mut short_iter = flag_str.chars();
-                short_iter.next();
-
-                while let Some(flag_ch) = short_iter.next() {
-                    match flag_ch {
-                        'i' => flags.ignore_case = true,
-                        'm' => {
-                            let max_num: String = short_iter.collect();
-                            flags.max_count = if max_num != "" {
-                                if let Ok(num) = max_num.parse() {
-                                    num
-                                } else {
-                                    return Err("invalid max count".to_string());
-                                }
-                            } else if let Some(s) = iter.next() {
-                                if let Ok(num) = s.parse() {
-                                    num
-                                } else {
-                                    return Err("invalide max count".to_string());
-                                }
-                            } else {
-                                return Err("invalid max count".to_string());
-                            };
-                            break;
-                        }
-                        _ => return Err(format!("can't parse option {}", flag_ch)),
-                    }
-                }
+                flags.short_parse(&flag_str, &mut iter)?;
             } else {
-                let mut split_flag = flag_str.split('=');
-                match split_flag.next().unwrap() {
-                    "--ignore-case" => flags.ignore_case = true,
-                    "--max-count" => {
-                        flags.max_count = if let Some(s) = split_flag.next() {
-                            if let Ok(num) = s.parse() {
-                                num
-                            } else {
-                                return Err("invalid max count".to_string());
-                            }
-                        } else if let Some(s) = iter.next() {
-                            if let Ok(num) = s.parse() {
-                                num
-                            } else {
-                                return Err("invalid max count".to_string());
-                            }
-                        } else {
-                            return Err("invalid max count".to_string());
-                        }
-                    }
-                    _ => return Err(format!("can't parse option {}", flag_str)),
-                }
+                flags.long_parse(&flag_str, &mut iter)?;
             }
         }
 
         Ok((flags, arguments))
+    }
+
+    fn short_parse<T>(&mut self, short_str: &String, iter: &mut T) -> Result<(), String>
+    where
+        T: Iterator,
+        T::Item: ToString,
+    {
+        let mut short_iter = short_str.chars();
+        short_iter.next();
+
+        while let Some(flag_ch) = short_iter.next() {
+            match flag_ch {
+                'i' => self.ignore_case = true,
+                'm' => {
+                    let max_num: String = short_iter.collect();
+                    self.max_count = if max_num != "" {
+                        if let Ok(num) = max_num.parse() {
+                            num
+                        } else {
+                            return Err("invalid max count".to_string());
+                        }
+                    } else if let Some(s) = iter.next() {
+                        if let Ok(num) = s.to_string().parse() {
+                            num
+                        } else {
+                            return Err("invalide max count".to_string());
+                        }
+                    } else {
+                        return Err("invalid max count".to_string());
+                    };
+                    break;
+                }
+                _ => return Err(format!("can't parse option {}", flag_ch)),
+            }
+        }
+        Ok(())
+    }
+
+    fn long_parse<T>(&mut self, long_str: &String, iter: &mut T) -> Result<(), String>
+    where
+        T: Iterator,
+        T::Item: ToString,
+    {
+        let mut split_flag = long_str.split('=');
+        match split_flag.next().unwrap() {
+            "--ignore-case" => self.ignore_case = true,
+            "--max-count" => {
+                self.max_count = if let Some(s) = split_flag.next() {
+                    if let Ok(num) = s.parse() {
+                        num
+                    } else {
+                        return Err("invalid max count".to_string());
+                    }
+                } else if let Some(s) = iter.next() {
+                    if let Ok(num) = s.to_string().parse() {
+                        num
+                    } else {
+                        return Err("invalid max count".to_string());
+                    }
+                } else {
+                    return Err("invalid max count".to_string());
+                }
+            }
+            _ => return Err(format!("can't parse option {}", long_str)),
+        }
+        Ok(())
     }
 }
 
