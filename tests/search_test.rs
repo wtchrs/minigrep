@@ -4,6 +4,7 @@ extern crate minigrep;
 mod tests {
     use minigrep::*;
 
+    // This tests should be edited because some logics were changed.
     #[test]
     fn case_sensitive() {
         let query = "duct";

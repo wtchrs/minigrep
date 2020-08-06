@@ -4,6 +4,7 @@ use std::fs;
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let contents = fs::read_to_string(config.filename)?;
+    let contents = contents.lines().enumerate().collect();
 
     let results = if config.flag.ignore_case {
         search_ignore_case(&config.query, &contents)
@@ -18,6 +19,13 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
             &results[..]
         };
 
+    let format_fn: Box<dyn Fn(&&(usize, &str)) -> _> = if config.flag.line_number {
+        Box::new(|(index, s)| format!("{}:{}", index, s))
+    } else {
+        Box::new(|(_, s)| String::from(*s))
+    };
+    let results = results.iter().map(format_fn).collect::<Vec<_>>();
+
     for line in results {
         println!("{}", line);
     }
@@ -25,19 +33,22 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
+pub fn search<'a>(query: &str, contents: &'a Vec<(usize, &str)>) -> Vec<&'a (usize, &'a str)> {
     contents
-        .lines()
-        .filter(|line| line.contains(query))
+        .iter()
+        .filter(|(_, line)| line.contains(query))
         .collect()
 }
 
-pub fn search_ignore_case<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
+pub fn search_ignore_case<'a>(
+    query: &str,
+    contents: &'a Vec<(usize, &str)>,
+) -> Vec<&'a (usize, &'a str)> {
     let query = query.to_lowercase();
 
     contents
-        .lines()
-        .filter(|line| line.to_lowercase().contains(&query))
+        .iter()
+        .filter(|(_, line)| line.to_lowercase().contains(&query))
         .collect()
 }
 
@@ -77,7 +88,18 @@ impl Config {
 
 pub struct Flag {
     pub ignore_case: bool,
+    pub line_number: bool,
     pub max_count: u8,
+}
+
+impl Default for Flag {
+    fn default() -> Self {
+        Self {
+            ignore_case: false,
+            line_number: false,
+            max_count: 0,
+        }
+    }
 }
 
 // it should have more options and logics.
@@ -114,6 +136,7 @@ impl Flag {
         while let Some(flag_ch) = short_iter.next() {
             match flag_ch {
                 'i' => self.ignore_case = true,
+                'n' => self.line_number = true,
                 'm' => {
                     let max_num: String = short_iter.collect();
                     self.max_count = if max_num != "" {
@@ -147,6 +170,8 @@ impl Flag {
         let mut split_flag = long_str.split('=');
         match split_flag.next().unwrap() {
             "--ignore-case" => self.ignore_case = true,
+            "--no-ignore-case" => self.ignore_case = false,
+            "--line-number" => self.line_number = true,
             "--max-count" => {
                 self.max_count = if let Some(s) = split_flag.next() {
                     if let Ok(num) = s.parse() {
@@ -166,15 +191,11 @@ impl Flag {
             }
             _ => return Err(format!("can't parse option {}", long_str)),
         }
-        Ok(())
-    }
-}
 
-impl Default for Flag {
-    fn default() -> Self {
-        Self {
-            ignore_case: false,
-            max_count: 0,
+        if let Some(_) = split_flag.next() {
+            Err("invalid option arguments".to_string())
+        } else {
+            Ok(())
         }
     }
 }
