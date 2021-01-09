@@ -8,19 +8,34 @@ mod tests {
     #[test]
     fn case_sensitive() {
         let query = "duct";
-        let contents = "Rust:\nsafe, fast, productive.\nPick three.\nDuct tape";
+        let contents = "Rust:\nsafe, fast, productive.\nPick three.\nDuct tape"
+            .lines()
+            .map(|s| s.to_string())
+            .enumerate()
+            .collect();
 
-        assert_eq!(vec!["safe, fast, productive."], search(query, contents));
+        let expect_match = vec![1]
+            .into_iter()
+            .zip(vec!["safe, fast, productive.".to_string()])
+            .collect::<Vec<_>>();
+
+        assert_eq!(expect_match, search(query, contents));
     }
 
     #[test]
     fn case_insensitive() {
         let query = "rUsT";
-        let contents = "Rust:\nsafe, fast, productive.\nPick three.\nTrust me.";
+        let contents = "Rust:\nsafe, fast, productive.\nPick three.\nTrust me."
+            .lines()
+            .map(|s| s.to_string())
+            .enumerate()
+            .collect();
 
-        assert_eq!(
-            vec!["Rust:", "Trust me."],
-            search_ignore_case(query, contents)
-        );
+        let expect_match = vec![0, 3]
+            .into_iter()
+            .zip(vec!["Rust:".to_string(), "Trust me.".to_string()])
+            .collect::<Vec<_>>();
+
+        assert_eq!(expect_match, search_ignore_case(query, contents));
     }
 }

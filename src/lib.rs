@@ -4,26 +4,32 @@ use std::fs;
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let contents = fs::read_to_string(config.filename)?;
-    let contents = contents.lines().enumerate().collect();
+    let contents = contents
+        .lines()
+        .enumerate()
+        .map(|(i, str)| (i, str.to_string()))
+        .collect::<Vec<(usize, String)>>();
 
     let results = if config.flag.ignore_case {
-        search_ignore_case(&config.query, &contents)
+        search_ignore_case(&config.query, contents)
     } else {
-        search(&config.query, &contents)
+        search(&config.query, contents)
     };
 
-    let results =
-        if (config.flag.max_count != 0) && ((config.flag.max_count as usize) < results.len()) {
-            &results[..config.flag.max_count as usize]
+    let results = if (config.flag.max_count != 0)
+        && ((config.flag.max_count as usize) < results.len())
+    {
+        results[..config.flag.max_count as usize].to_owned()
+    } else {
+        results
+    };
+
+    let format_fn: Box<dyn Fn(&(usize, String)) -> String> =
+        if config.flag.line_number {
+            Box::new(|(index, s)| format!("{}:{}", index, s))
         } else {
-            &results[..]
+            Box::new(|(_, s)| s.to_string())
         };
-
-    let format_fn: Box<dyn Fn(&&(usize, &str)) -> _> = if config.flag.line_number {
-        Box::new(|(index, s)| format!("{}:{}", index, s))
-    } else {
-        Box::new(|(_, s)| String::from(*s))
-    };
     let results = results.iter().map(format_fn).collect::<Vec<_>>();
 
     for line in results {
@@ -33,21 +39,24 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn search<'a>(query: &str, contents: &'a Vec<(usize, &str)>) -> Vec<&'a (usize, &'a str)> {
+pub fn search(
+    query: &str,
+    contents: Vec<(usize, String)>,
+) -> Vec<(usize, String)> {
     contents
-        .iter()
+        .into_iter()
         .filter(|(_, line)| line.contains(query))
         .collect()
 }
 
 pub fn search_ignore_case<'a>(
     query: &str,
-    contents: &'a Vec<(usize, &str)>,
-) -> Vec<&'a (usize, &'a str)> {
+    contents: Vec<(usize, String)>,
+) -> Vec<(usize, String)> {
     let query = query.to_lowercase();
 
     contents
-        .iter()
+        .into_iter()
         .filter(|(_, line)| line.to_lowercase().contains(&query))
         .collect()
 }
@@ -104,7 +113,9 @@ impl Default for Flag {
 
 // it should have more options and logics.
 impl Flag {
-    pub fn from_vec<'a>(flag_strs: &'a Vec<String>) -> Result<(Flag, Vec<&'a String>), String> {
+    pub fn from_vec<'a>(
+        flag_strs: &'a Vec<String>,
+    ) -> Result<(Flag, Vec<&'a String>), String> {
         let mut iter = flag_strs.iter();
         let mut flags: Flag = Default::default();
         let mut arguments = Vec::new();
@@ -125,7 +136,11 @@ impl Flag {
         Ok((flags, arguments))
     }
 
-    fn short_parse<T>(&mut self, short_str: &String, iter: &mut T) -> Result<(), String>
+    fn short_parse<T>(
+        &mut self,
+        short_str: &String,
+        iter: &mut T,
+    ) -> Result<(), String>
     where
         T: Iterator,
         T::Item: ToString,
@@ -162,7 +177,11 @@ impl Flag {
         Ok(())
     }
 
-    fn long_parse<T>(&mut self, long_str: &String, iter: &mut T) -> Result<(), String>
+    fn long_parse<T>(
+        &mut self,
+        long_str: &String,
+        iter: &mut T,
+    ) -> Result<(), String>
     where
         T: Iterator,
         T::Item: ToString,
