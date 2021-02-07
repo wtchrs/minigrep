@@ -49,7 +49,7 @@ pub fn search(
         .collect()
 }
 
-pub fn search_ignore_case<'a>(
+pub fn search_ignore_case(
     query: &str,
     contents: Vec<(usize, String)>,
 ) -> Vec<(usize, String)> {
@@ -113,20 +113,20 @@ impl Default for Flag {
 
 // it should have more options and logics.
 impl Flag {
-    pub fn from_vec<'a>(
-        flag_strs: &'a Vec<String>,
-    ) -> Result<(Flag, Vec<&'a String>), String> {
+    pub fn from_vec(
+        flag_strs: &Vec<String>,
+    ) -> Result<(Flag, Vec<&String>), String> {
         let mut iter = flag_strs.iter();
-        let mut flags: Flag = Default::default();
+        let mut flags = Flag::default();
         let mut arguments = Vec::new();
 
         while let Some(flag_str) = iter.next() {
-            if flag_str.chars().nth(0).unwrap() != '-' {
+            if !flag_str.starts_with('-') {
                 arguments.push(flag_str);
                 continue;
             }
 
-            if flag_str.chars().nth(1).unwrap() != '-' {
+            if !flag_str.starts_with("--") {
                 flags.short_parse(&flag_str, &mut iter)?;
             } else {
                 flags.long_parse(&flag_str, &mut iter)?;
@@ -154,7 +154,7 @@ impl Flag {
                 'n' => self.line_number = true,
                 'm' => {
                     let max_num: String = short_iter.collect();
-                    self.max_count = if max_num != "" {
+                    self.max_count = if !max_num.is_empty() {
                         if let Ok(num) = max_num.parse() {
                             num
                         } else {
@@ -211,7 +211,7 @@ impl Flag {
             _ => return Err(format!("can't parse option {}", long_str)),
         }
 
-        if let Some(_) = split_flag.next() {
+        if split_flag.next().is_some() {
             Err("invalid option arguments".to_string())
         } else {
             Ok(())
